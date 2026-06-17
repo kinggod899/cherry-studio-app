@@ -3,21 +3,46 @@ name: 安卓发布
 on:
   workflow_dispatch:
 
-env:
-  # 提前启用 Node.js 24 运行时，消除弃用警告
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-apk:
     runs-on: ubuntu-latest
     name: 构建APK
 
     steps:
-      # 1. 拉取代码
+      # 1. 拉取仓库代码
       - name: 检出代码
         uses: actions/checkout@v4
 
-      # 2. 配置 Java 环境（安卓构建必需）
+      # 2. 配置 Node.js 20 LTS（稳定兼容，避免新版本PATH异常）
+      - name: 配置 Node.js 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      # 3. 启用官方Corepack，自动匹配项目声明的pnpm版本
+      # 彻底解决版本冲突+找不到命令两大问题
+      - name: 安装并激活 pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.26.2 --activate
+
+      # 4. 安装项目全量依赖（monorepo  workspace）
+      - name: 安装项目依赖
+        run: pnpm install --no-frozen-lockfile
+
+      # 5. 生成数据库 schema 文件（项目必需步骤）
+      - name: 生成 Drizzle 数据库文件
+        run: npx drizzle-kit generate
+
+      # 6. 构建子包 react-native-streamable-http（项目必需步骤）
+      - name: 构建原生 HTTP 依赖包
+        run: |
+          cd packages/react-native-streamable-http
+          npm install
+          npm run build
+
+      # 7. 配置 Java 17 环境（安卓构建必需）
       - name: 配置 Java 环境
         uses: actions/setup-java@v4
         with:
@@ -25,39 +50,24 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # 3. 配置 Android SDK
+      # 8. 配置 Android SDK
       - name: 配置 Android SDK
         uses: android-actions/setup-android@v3
 
-      # 4. 配置 Node.js 环境
-      - name: 配置 Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
+      # 9. Expo 生成安卓原生工程代码（必须步骤，否则没有android目录）
+      - name: 生成安卓原生项目
+        run: npx expo prebuild -p android --no-install
 
-      # 5. 全局安装指定版本 pnpm（核心修复，100% 能找到命令）
-      - name: 安装 pnpm 10.26.2
-        run: npm install -g pnpm@10.26.2
-
-      # 6. 安装项目依赖
-      - name: 安装依赖
-        run: pnpm install --no-frozen-lockfile
-
-      # 7. 前端构建（如果你的项目命令不同，改这里）
-      - name: 构建前端资源
-        run: pnpm build
-
-      # 8. 安卓 APK 打包
+      # 10. 构建 Release APK
       - name: 赋予 gradlew 执行权限
         run: chmod +x android/gradlew
 
-      - name: 构建 Release APK
+      - name: 执行安卓打包
         working-directory: android
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --no-daemon
 
-      # 9. 上传 APK 产物，构建完可在 Actions 页面下载
-      - name: 上传 APK
+      # 11. 上传APK产物，构建完可在Actions页面下载
+      - name: 上传 APK 构建产物
         uses: actions/upload-artifact@v4
         with:
           name: app-release.apk
