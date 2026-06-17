@@ -1,10 +1,8 @@
 name: 安卓发布
 
-# 触发方式：手动触发，可按需补充 push/pr 触发
 on:
   workflow_dispatch:
 
-# 全局环境变量：提前启用 Node.js 24，消除弃用警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -30,29 +28,23 @@ jobs:
       - name: 配置 Android SDK
         uses: android-actions/setup-android@v3
 
-      # 4. 配置 Node.js 24 + pnpm 缓存
+      # 4. 配置 Node.js + 自动启用 pnpm（核心修改）
       - name: 配置 Node.js 环境
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'pnpm'
+          corepack: true  # 启用Node原生Corepack，自动匹配package.json的pnpm版本
 
-      # 5. 安装 pnpm（自动读取 package.json 的 packageManager 版本）
-      - name: 安装 pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          # 不指定 version，自动匹配 package.json 中声明的版本
-          run_install: false
-
-      # 6. 安装项目依赖
+      # 5. 安装项目依赖
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile
 
-      # 7. 前端资源构建（根据你的项目命令调整，如 pnpm build / pnpm build:android）
+      # 6. 前端资源构建（按你项目实际命令调整）
       - name: 构建前端资源
         run: pnpm build
 
-      # 8. 安卓构建：授予执行权限 + 打包 APK
+      # 7. 安卓 APK 构建
       - name: 授予 gradlew 执行权限
         run: chmod +x android/gradlew
 
@@ -60,7 +52,7 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease
 
-      # 9. 上传 APK 产物，可在 Actions 页面下载
+      # 8. 上传 APK 产物，可在 Actions 页面下载
       - name: 上传 APK 构建产物
         uses: actions/upload-artifact@v4
         with:
