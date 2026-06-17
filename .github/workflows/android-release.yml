@@ -13,29 +13,29 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      # 2. 配置 Node.js 20 LTS（稳定兼容，避免新版本PATH异常）
-      - name: 配置 Node.js 环境
+      # 2. 安装 pnpm（必须放在 setup-node 之前，官方标准顺序）
+      - name: 安装 pnpm 10.26.2
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+          run_install: false
+
+      # 3. 配置 Node.js 环境（pnpm 已存在，缓存功能才能正常生效）
+      - name: 配置 Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
-      # 3. 启用官方Corepack，自动匹配项目声明的pnpm版本
-      # 彻底解决版本冲突+找不到命令两大问题
-      - name: 安装并激活 pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.26.2 --activate
-
-      # 4. 安装项目全量依赖（monorepo  workspace）
+      # 4. 安装 monorepo 全量依赖
       - name: 安装项目依赖
         run: pnpm install --no-frozen-lockfile
 
-      # 5. 生成数据库 schema 文件（项目必需步骤）
-      - name: 生成 Drizzle 数据库文件
+      # 5. 生成 Drizzle 数据库 schema 文件（仓库 README 必需步骤）
+      - name: 生成数据库文件
         run: npx drizzle-kit generate
 
-      # 6. 构建子包 react-native-streamable-http（项目必需步骤）
+      # 6. 构建子包 react-native-streamable-http（仓库 README 必需步骤）
       - name: 构建原生 HTTP 依赖包
         run: |
           cd packages/react-native-streamable-http
@@ -54,7 +54,7 @@ jobs:
       - name: 配置 Android SDK
         uses: android-actions/setup-android@v3
 
-      # 9. Expo 生成安卓原生工程代码（必须步骤，否则没有android目录）
+      # 9. Expo 生成安卓原生工程（必须步骤，否则不存在 android 目录）
       - name: 生成安卓原生项目
         run: npx expo prebuild -p android --no-install
 
@@ -66,7 +66,7 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
-      # 11. 上传APK产物，构建完可在Actions页面下载
+      # 11. 上传 APK 产物，构建完成可在 Actions 页面下载
       - name: 上传 APK 构建产物
         uses: actions/upload-artifact@v4
         with:
