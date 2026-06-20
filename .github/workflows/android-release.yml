@@ -64,7 +64,8 @@ jobs:
 
       - name: 执行安卓打包
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        # 排除会崩溃的 async-storage lint 任务，避免 lint 崩溃中断构建
+        run: ./gradlew assembleRelease -x :react-native-async-storage_async-storage:lintVitalAnalyzeRelease --no-daemon
 
       # 11. 上传 APK 产物，构建完成可在 Actions 页面下载
       - name: 上传 APK 构建产物
